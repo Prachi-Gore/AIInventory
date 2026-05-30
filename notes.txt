@@ -1,0 +1,94 @@
+config 
+   settings.py
+   logger.py
+database 
+agents
+   report_agent.py
+      get_inventory_status
+      get_product_details
+      get_inventory_by_category
+      get_inventory_by_region
+      calculate_reorder_quantity
+services
+   data_pipeline.py
+      calculate_cutoff_date
+      fetch_sales_data
+      aggregate_sales_metrics
+      get_sales_patterns
+      fetch_vendor_data
+      get_vendor_performance
+tools
+   finance.py
+      get_financial_summary
+services
+   ticket_manager.py   
+      create_reorder_ticket
+      get_pending_tickets
+      update_ticket_status
+      get_ticket_stats
+      calculate_recommended_quantity
+tools
+   weather.py 
+     get_weather_forecast
+agents
+   decision_agent.py
+     format_low_stock_items
+     format_vendors
+     build_system_prompt
+     build_inventory_analysis_prompt
+     build_sales_opportunity_prompt
+     build_vendor_selection_prompt
+     create_decision_agent_executor
+     analyze_inventory_needs
+     analyze_sales_opportunity
+     optimize_vendor_selection
+     analyze_financial_health
+database
+   memory_manager.py
+      add_conversation
+agents
+   coordinator.py
+      AgentState
+      parse_classification_response
+      build_classification_prompt
+      classify_intent
+      gather_data
+      make_decision
+      format_inventory
+      format_sales
+      format_financial
+      format_tickets
+      format_response
+      route_after_classify
+      route_after_gather
+      build_workflow
+      create_initial_state
+      save_conversation_to_memory
+      process_query
+main.py
+   run_cli / run_web / show_stats
+   main
+ui   
+   streamlit_app.py
+      init_session_state
+      render_sidebar
+      render_chat_interface
+      render_data_explorer
+      render_ticket_manager
+      render_forecast_accuracy
+      Add data explorer tab
+      
+### Advance
+
+services
+   forecast_updater.py
+      update_past_forecasts
+      get_forecast_accuracy_report
+integrations
+   mcp_server.py
+   
+   
+
+
+
+

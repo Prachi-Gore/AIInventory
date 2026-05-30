@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="920" viewBox="0 0 1500 920" role="img" aria-labelledby="title desc">
+  <title id="title">Inventra LangGraph Workflow</title>
+  <desc id="desc">Clear state-machine diagram for the Inventra LangGraph workflow from START to END with classify, gather, decide, respond, and conditional route nodes.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 34px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #475569; }
+      .node { fill: #ffffff; stroke: #2563eb; stroke-width: 2.5; rx: 16; }
+      .startend { fill: #ecfdf5; stroke: #16a34a; stroke-width: 2.5; rx: 34; }
+      .route { fill: #fff7ed; stroke: #ea580c; stroke-width: 2.5; }
+      .ai { fill: #fef3c7; stroke: #d97706; stroke-width: 2.5; rx: 16; }
+      .data { fill: #ecfeff; stroke: #0891b2; stroke-width: 2.5; rx: 16; }
+      .response { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 2.5; rx: 16; }
+      .memory { fill: #f1f5f9; stroke: #64748b; stroke-width: 2; rx: 14; }
+      .label { font: 700 20px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 400 15px Arial, sans-serif; fill: #475569; }
+      .tiny { font: 400 13px Arial, sans-serif; fill: #64748b; }
+      .edge { stroke: #334155; stroke-width: 2.6; fill: none; marker-end: url(#arrow); }
+      .edge-muted { stroke: #64748b; stroke-width: 2.3; fill: none; marker-end: url(#arrow); }
+      .route-label { font: 700 15px Arial, sans-serif; fill: #0f172a; }
+      .code { font: 400 14px Consolas, monospace; fill: #334155; }
+      .panel-title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1500" height="920"/>
+
+  <text x="52" y="55" class="title">Inventra LangGraph Workflow</text>
+  <text x="52" y="90" class="subtitle">The coordinator routes each user query through classify, gather, optional decision-making, response formatting, and memory persistence.</text>
+
+  <!-- Main happy path -->
+  <rect x="80" y="175" width="160" height="76" class="startend"/>
+  <text x="160" y="207" text-anchor="middle" class="label">START</text>
+  <text x="160" y="231" text-anchor="middle" class="small">initial state</text>
+
+  <rect x="315" y="150" width="230" height="126" class="ai"/>
+  <text x="430" y="184" text-anchor="middle" class="label">classify</text>
+  <text x="430" y="210" text-anchor="middle" class="small">classify_intent()</text>
+  <text x="430" y="235" text-anchor="middle" class="tiny">OpenAI classifies query</text>
+  <text x="430" y="255" text-anchor="middle" class="tiny">intent, region, category, sku</text>
+
+  <polygon points="705,140 850,213 705,286 560,213" class="route"/>
+  <text x="705" y="194" text-anchor="middle" class="label">route_after</text>
+  <text x="705" y="220" text-anchor="middle" class="label">_classify()</text>
+  <text x="705" y="245" text-anchor="middle" class="small">business intent?</text>
+
+  <rect x="945" y="150" width="230" height="126" class="data"/>
+  <text x="1060" y="184" text-anchor="middle" class="label">gather</text>
+  <text x="1060" y="210" text-anchor="middle" class="small">gather_data()</text>
+  <text x="1060" y="235" text-anchor="middle" class="tiny">report agent, tickets,</text>
+  <text x="1060" y="255" text-anchor="middle" class="tiny">finance, SQLite queries</text>
+
+  <polygon points="1060,380 1210,455 1060,530 910,455" class="route"/>
+  <text x="1060" y="436" text-anchor="middle" class="label">route_after</text>
+  <text x="1060" y="462" text-anchor="middle" class="label">_gather()</text>
+  <text x="1060" y="487" text-anchor="middle" class="small">decision intent?</text>
+
+  <rect x="615" y="395" width="230" height="126" class="ai"/>
+  <text x="730" y="429" text-anchor="middle" class="label">decide</text>
+  <text x="730" y="455" text-anchor="middle" class="small">make_decision()</text>
+  <text x="730" y="480" text-anchor="middle" class="tiny">decision agent calls</text>
+  <text x="730" y="500" text-anchor="middle" class="tiny">OpenAI + weather tool</text>
+
+  <rect x="615" y="645" width="230" height="126" class="response"/>
+  <text x="730" y="679" text-anchor="middle" class="label">respond</text>
+  <text x="730" y="705" text-anchor="middle" class="small">format_response()</text>
+  <text x="730" y="730" text-anchor="middle" class="tiny">creates final_response</text>
+  <text x="730" y="750" text-anchor="middle" class="tiny">for the user</text>
+
+  <rect x="1000" y="670" width="210" height="78" class="memory"/>
+  <text x="1105" y="702" text-anchor="middle" class="label">memory save</text>
+  <text x="1105" y="727" text-anchor="middle" class="small">add_conversation()</text>
+
+  <rect x="1290" y="670" width="150" height="78" class="startend"/>
+  <text x="1365" y="703" text-anchor="middle" class="label">END</text>
+  <text x="1365" y="728" text-anchor="middle" class="small">return string</text>
+
+  <!-- AgentState panel -->
+  <rect x="80" y="390" width="400" height="290" class="node"/>
+  <text x="110" y="426" class="panel-title">AgentState passed between nodes</text>
+  <text x="110" y="465" class="code">messages: [HumanMessage(query)]</text>
+  <text x="110" y="493" class="code">query: original user text</text>
+  <text x="110" y="521" class="code">intent: inventory_status / ...</text>
+  <text x="110" y="549" class="code">region, category, sku</text>
+  <text x="110" y="577" class="code">data_result: reports / tickets</text>
+  <text x="110" y="605" class="code">decision_result: AI analysis</text>
+  <text x="110" y="633" class="code">final_response: formatted answer</text>
+
+  <!-- Edges -->
+  <path d="M240 213 H315" class="edge"/>
+  <path d="M545 213 H560" class="edge"/>
+  <path d="M850 213 H945" class="edge"/>
+  <path d="M1060 276 V380" class="edge"/>
+  <path d="M910 455 H845" class="edge"/>
+  <path d="M730 521 V645" class="edge"/>
+  <path d="M845 708 H1000" class="edge"/>
+  <path d="M1210 709 H1290" class="edge"/>
+
+  <!-- Conditional shortcuts -->
+  <path d="M705 286 C705 410 730 540 730 645" class="edge-muted"/>
+  <path d="M1210 455 C1340 455 1365 560 1365 670" class="edge-muted"/>
+  <path d="M1060 530 C1045 610 900 708 845 708" class="edge-muted"/>
+
+  <!-- Edge labels, deliberately away from nodes -->
+  <text x="865" y="195" class="route-label">known report/decision intent</text>
+  <text x="724" y="355" class="route-label">general greeting/question</text>
+  <text x="858" y="438" class="route-label">yes</text>
+  <text x="774" y="586" class="route-label">AI recommendation done</text>
+  <text x="1090" y="594" class="route-label">no: reporting intent</text>
+  <text x="1240" y="445" class="route-label">skip AI path</text>
+
+  <!-- Route legend -->
+  <rect x="945" y="40" width="460" height="88" class="node"/>
+  <text x="975" y="72" class="panel-title">Route meaning</text>
+  <text x="975" y="100" class="small">general -> respond directly</text>
+  <text x="1170" y="100" class="small">reports -> gather -> respond</text>
+  <text x="975" y="122" class="small">recommendations -> gather -> decide -> respond</text>
+</svg>

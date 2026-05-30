@@ -1,0 +1,590 @@
+INVENTRA INTERVIEW PREPARATION
+==============================
+
+Project:
+Inventra - AI-powered weather-aware inventory and financial management system.
+
+Role Target:
+Agentic AI / Generative AI Engineer.
+
+
+1. HOW TO EXPLAIN THE CSV DATASETS
+==================================
+
+Short answer:
+-------------
+The project uses four synthetic CSV seed datasets: inventory, sales, finance, and vendors.
+They are loaded into SQLite during setup so the AI agents have realistic business data to reason over.
+In production, these would come from ERP, POS, finance, vendor management, or warehouse systems, not static CSV files.
+
+
+Why CSV files are used in this repo:
+------------------------------------
+I used CSV files as seed/demo data so the project can run locally without requiring a production database or external ERP integration.
+The CSVs make the project reproducible: anyone can clone the repo, seed SQLite, and test inventory, finance, sales, ticket, and AI recommendation flows.
+
+Production clarification:
+-------------------------
+In a real company, I would not commit real operational data into the repo.
+I would only keep mock/sample seed data or test fixtures.
+Production data would live in PostgreSQL, MySQL, Snowflake, BigQuery, S3, or enterprise systems like ERP/POS APIs.
+
+
+2. DATASET-BY-DATASET EXPLANATION
+=================================
+
+A. inventory.csv
+----------------
+Path:
+database/data/inventory.csv
+
+Columns:
+sku, name, category, region, qty, reorder_threshold, unit_cost, vendor_id
+
+How to explain:
+This is the master inventory dataset. Each row represents a product/SKU currently stocked by the business.
+It tells us what the product is, where it is stocked, how many units are available, when it should be reordered, its unit cost, and the preferred vendor.
+
+Important columns:
+- sku: Unique product identifier. Used to join inventory with sales, finance, tickets, and forecasts.
+- name: Human-readable product name, for example Mixer Grinder or Pressure Cooker.
+- category: Product grouping, such as Kitchen Appliances.
+- region: Business region where the stock is held, such as North, South, East, West, or Central.
+- qty: Current quantity in stock.
+- reorder_threshold: Minimum safe stock level. If qty <= reorder_threshold, the product is low stock.
+- unit_cost: Cost per unit.
+- vendor_id: Preferred vendor for that product.
+
+Interview explanation:
+"The inventory file is the operational stock snapshot. The report agent uses qty and reorder_threshold to identify low-stock items, and the decision agent uses this context to recommend reorder actions."
+
+Example business logic:
+qty = 10
+reorder_threshold = 20
+Because 10 <= 20, this item is treated as low stock.
+
+Code connection:
+agents/report_agent.py uses:
+low_stock = df[df["qty"] <= df["reorder_threshold"]]
+
+
+B. sales.csv
+------------
+Path:
+database/data/sales.csv
+
+Columns:
+date, sku, qty, revenue, region, temperature, rainfall, humidity, weather_condition
+
+How to explain:
+This dataset stores historical sales transactions along with weather context at the time of sale.
+It is important because the project is weather-aware: we can analyze how sales quantity changes under Rainy, Sunny, Thunderstorm, or other weather conditions.
+
+Important columns:
+- date: Sale date.
+- sku: Product sold.
+- qty: Units sold.
+- revenue: Revenue generated from the sale.
+- region: Region where the sale happened.
+- temperature, rainfall, humidity: Weather metrics during the sale.
+- weather_condition: Human-readable weather category.
+
+Interview explanation:
+"The sales data is used for demand and weather-impact analysis. The data pipeline groups sales by region and weather condition to understand which weather patterns drive demand."
+
+Example analytics:
+services/data_pipeline.py calculates:
+- total_sales
+- total_revenue
+- avg_daily_sales
+- top selling records
+- weather_impact
+- region_performance
+
+Code connection:
+weather_impact = df.groupby("weather_condition")["qty"].sum().to_dict()
+
+Meaning:
+It calculates how many total units were sold under each weather condition.
+
+
+C. finance.csv
+--------------
+Path:
+database/data/finance.csv
+
+Columns:
+id, sku, date, amount, type, region
+
+How to explain:
+This dataset stores financial transactions related to products.
+The type column separates sales from purchases, allowing the system to calculate total sales, total purchases, net profit, and profit margin.
+
+Important columns:
+- id: Transaction id.
+- sku: Product involved in the transaction.
+- date: Transaction date.
+- amount: Money value of the transaction.
+- type: sale or purchase.
+- region: Region where the transaction occurred.
+
+Interview explanation:
+"The finance file supports deterministic financial reporting. The finance tool filters transactions by date and region, sums sale amounts, sums purchase amounts, and calculates net profit."
+
+Example calculation:
+total_sales = sum(amount where type == "sale")
+total_purchases = sum(amount where type == "purchase")
+net_profit = total_sales - total_purchases
+
+Code connection:
+tools/finance.py computes financial summaries from this data.
+
+
+D. vendors.csv
+--------------
+Path:
+database/data/vendors.csv
+
+Columns:
+vendor_id, name, lead_time_days, unit_price, on_time_delivery_rate, quality_score,
+avg_delay_days, reliability_rating, return_acceptance_rate, total_shipments_last_year,
+payment_terms_days, bulk_discount_percent, min_order_qty
+
+How to explain:
+This dataset represents vendor performance and procurement details.
+It helps the system recommend not only what to reorder, but also which vendor is best suited based on reliability, quality, lead time, pricing, and terms.
+
+Important columns:
+- vendor_id: Unique vendor identifier.
+- name: Vendor name.
+- lead_time_days: How long the vendor usually takes to deliver.
+- unit_price: Vendor's unit price.
+- on_time_delivery_rate: Delivery reliability metric.
+- quality_score: Product/service quality metric.
+- avg_delay_days: Typical delay.
+- reliability_rating: Human-readable reliability category.
+- return_acceptance_rate: How flexible the vendor is with returns.
+- payment_terms_days: Credit/payment period.
+- bulk_discount_percent: Discount available for bulk orders.
+- min_order_qty: Minimum order quantity.
+
+Interview explanation:
+"The vendor dataset is used by the decision agent to make procurement recommendations. Instead of recommending reorder quantity alone, the system can also explain vendor tradeoffs such as quality, lead time, and reliability."
+
+Code connection:
+services/data_pipeline.py fetches vendors sorted by quality, reliability, and lead time.
+agents/decision_agent.py formats top vendors into the LLM prompt.
+
+
+3. HOW THE DATASETS ARE CONNECTED
+=================================
+
+Logical relationships:
+
+vendors.vendor_id
+  -> inventory.vendor_id
+  -> tickets.vendor_id
+
+inventory.sku
+  -> sales.sku
+  -> finance.sku
+  -> tickets.sku
+  -> forecasts.sku
+
+Simple explanation:
+Inventory is the central product table.
+Sales and finance describe product movement and money.
+Vendors describe procurement options.
+Tickets represent operational actions created from low-stock or reorder recommendations.
+
+Important note:
+In the current SQLite schema, these are logical relationships through common keys.
+The schema does not enforce all foreign keys.
+In production, I would add foreign key constraints, indexes, and migration scripts.
+
+
+4. HOW TO EXPLAIN DATA FLOW IN INTERVIEW
+========================================
+
+Example: "Show low stock items"
+-------------------------------
+1. User asks: "Show low stock items"
+2. LangGraph coordinator classifies intent as inventory_status.
+3. gather_data calls report_agent.get_inventory_status().
+4. report_agent reads inventory table.
+5. Pandas filters rows where qty <= reorder_threshold.
+6. Coordinator formats the low-stock items into a response.
+
+
+Example: "Recommend reorder quantities"
+---------------------------------------
+1. User asks for reorder recommendations.
+2. Coordinator classifies intent as reorder_recommendation.
+3. Decision agent fetches inventory status.
+4. It fetches vendor performance.
+5. It builds a prompt with low-stock items and top vendors.
+6. OpenAI reasons over the data and may call the weather tool.
+7. Final recommendation is returned to the user.
+
+
+Example: "Find sales opportunities"
+-----------------------------------
+1. Coordinator classifies intent as sales_opportunity.
+2. Decision agent fetches sales patterns from sales.csv-backed SQLite data.
+3. Data pipeline calculates revenue, quantity, weather impact, and region performance.
+4. OpenAI reasons about weather-sensitive demand opportunities.
+5. User gets recommended regions/products to focus on.
+
+
+5. RESUME-FRIENDLY DATA EXPLANATION
+===================================
+
+Use this:
+"Designed a synthetic retail operations dataset with inventory, sales, finance, and vendor data, seeded into SQLite for local reproducibility. The data model supports low-stock detection, financial summaries, weather-aware demand analysis, vendor selection, and automated ticket workflows."
+
+Avoid saying:
+"I used real company data."
+
+Better:
+"I used synthetic seed data to simulate real inventory and financial operations."
+
+
+6. COMMON INTERVIEW QUESTIONS AND ANSWERS
+=========================================
+
+Q1. What problem does this project solve?
+-----------------------------------------
+It solves inventory and finance decision-making for a retail or supply-chain team.
+Users can ask natural-language questions about inventory, sales, finance, weather-driven demand, and reorder actions.
+
+
+Q2. Why use an agentic architecture?
+------------------------------------
+Because the system has multiple types of work:
+- classify user intent
+- gather deterministic business data
+- call tools like weather APIs
+- reason over recommendations
+- format responses
+LangGraph makes this workflow explicit and controllable instead of relying on one monolithic LLM call.
+
+
+Q3. Where is LangGraph used?
+----------------------------
+LangGraph is used in agents/coordinator.py.
+It defines the workflow nodes:
+- classify
+- gather
+- decide
+- respond
+and conditional routes between them.
+
+
+Q4. What is AgentState?
+-----------------------
+AgentState is the shared state dictionary passed between LangGraph nodes.
+It stores query, intent, region, category, sku, data_result, decision_result, messages, and final_response.
+
+
+Q5. Why not just use one LangChain agent?
+-----------------------------------------
+One agent could work for a demo, but it would be less deterministic and harder to debug.
+LangGraph lets me control when to call the LLM, when to use deterministic code, and how to route different query types.
+
+
+Q6. Where is OpenAI used?
+-------------------------
+OpenAI is used through LangChain's ChatOpenAI wrapper.
+The coordinator uses it for intent classification.
+The decision agent uses it for reasoning and recommendations with tool calling.
+
+
+Q7. Where is deterministic logic used?
+--------------------------------------
+Deterministic logic is used for:
+- SQL queries
+- Pandas aggregations
+- low-stock filtering
+- financial calculations
+- ticket creation and updates
+- response formatting
+
+
+Q8. Why separate deterministic logic from LLM logic?
+----------------------------------------------------
+Because facts and calculations should be reliable and testable.
+The LLM should explain, reason, and recommend, but not be trusted as the source of numeric truth.
+
+
+Q9. How does weather-aware intelligence work?
+---------------------------------------------
+Sales data includes weather features such as temperature, rainfall, humidity, and weather_condition.
+The weather tool also fetches upcoming forecasts.
+The decision agent uses this context to reason about likely demand changes.
+
+
+Q10. What is the role of the weather tool?
+------------------------------------------
+tools/weather.py wraps OpenWeatherMap forecast data as a LangChain StructuredTool.
+The decision agent can call this tool during recommendation generation.
+
+
+Q11. What is the role of MCP in this project?
+---------------------------------------------
+The MCP server demonstrates how external ML capabilities can be exposed as tools.
+Currently, it exposes a Hugging Face sentiment analysis tool over MCP.
+It can be extended to expose Inventra-specific tools like get_low_stock_items or create_reorder_ticket.
+
+
+Q12. Is the MCP server core to the main app?
+--------------------------------------------
+Not currently.
+The main app works without MCP.
+The MCP server is an integration extension showing how the project could expose tools to MCP-compatible AI clients.
+
+
+Q13. What is the database?
+--------------------------
+The project uses SQLite for local development and demo reproducibility.
+CSV files seed the database.
+In production, I would migrate to PostgreSQL and use migrations.
+
+
+Q14. Why SQLite?
+----------------
+SQLite is lightweight, easy to set up, and good for a local demo.
+It avoids requiring users to install a database server.
+For production, PostgreSQL would be better for concurrency, indexing, access control, and scaling.
+
+
+Q15. Would you keep CSV files in a production repo?
+---------------------------------------------------
+Only synthetic sample data or test fixtures.
+Real sales, inventory, finance, and vendor data should live in secure databases, warehouses, or enterprise systems.
+
+
+Q16. What are the main tables?
+------------------------------
+- inventory
+- sales
+- finance
+- vendors
+- tickets
+- conversations
+- forecasts
+
+
+Q17. How do you identify low-stock products?
+--------------------------------------------
+The report agent checks:
+qty <= reorder_threshold
+Those rows are considered low stock.
+
+
+Q18. How do you calculate financial summary?
+--------------------------------------------
+The finance tool sums sale transactions and purchase transactions.
+Then:
+net_profit = total_sales - total_purchases
+profit_margin = net_profit / total_sales
+
+
+Q19. What does the ticket manager do?
+-------------------------------------
+It creates, fetches, updates, and summarizes reorder tickets.
+Tickets represent operational follow-up actions, such as purchasing more stock.
+
+
+Q20. Does the LLM directly write to the database?
+-------------------------------------------------
+No, not directly.
+Database writes are handled by deterministic service functions.
+This is safer because side effects should be controlled and auditable.
+
+
+Q21. How would you make ticket creation safer?
+----------------------------------------------
+I would add human-in-the-loop approval.
+The LLM can recommend a ticket, but a user should approve before the system writes it to the database.
+
+
+Q22. What is the Streamlit UI responsible for?
+----------------------------------------------
+The UI displays dashboard metrics, chat, data explorer, tickets, and forecast accuracy.
+It should not contain core business logic.
+It calls backend functions like coordinator.process_query().
+
+
+Q23. What bug did you fix in Streamlit?
+---------------------------------------
+The UI imported process_query from the coordinator and then defined another local function with the same name.
+That caused recursion.
+I fixed it by aliasing the import as run_agent_query and renaming the local handler to handle_user_query.
+
+
+Q24. What did you change when migrating from Gemini to OpenAI?
+-------------------------------------------------------------
+I replaced ChatGoogleGenerativeAI with ChatOpenAI, changed settings from GEMINI_API_KEY to OPENAI_API_KEY, added OPENAI_MODEL, and updated requirements to use langchain-openai.
+
+
+Q25. How would you scale this project?
+--------------------------------------
+I would:
+- move SQLite to PostgreSQL
+- add proper migrations
+- add API backend with FastAPI
+- cache expensive queries
+- add background jobs for forecasts
+- add tracing with LangSmith or OpenTelemetry
+- add auth and role-based access
+- add human approval for write actions
+- add tests and evaluation datasets
+
+
+7. ADVANCED AGENTIC AI QUESTIONS
+================================
+
+Q1. What makes this project agentic?
+------------------------------------
+It has goal-directed workflow execution, stateful routing, tool usage, and specialized agents.
+The coordinator decides which path to execute based on user intent.
+The decision agent can use tools and business context to generate recommendations.
+
+
+Q2. What is the difference between an LLM chain and an agent here?
+------------------------------------------------------------------
+A chain follows a fixed sequence.
+An agent can reason and call tools.
+In this project, LangGraph handles workflow routing, and the decision agent uses tool-calling behavior for weather-aware recommendations.
+
+
+Q3. What is tool calling?
+-------------------------
+Tool calling lets the LLM request execution of an external function.
+For example, the decision agent can call the weather forecast tool instead of guessing the weather.
+
+
+Q4. What is the risk of giving tools to an LLM?
+-----------------------------------------------
+The LLM may call the wrong tool, call it with bad arguments, or trigger side effects.
+That is why tool schemas, validation, logging, permissions, and human approval are important.
+
+
+Q5. How do you prevent hallucination?
+-------------------------------------
+- Keep business facts in SQL/Pandas
+- Give the LLM structured context
+- Use tool calls for external facts
+- Validate outputs
+- Use deterministic formatting for reports
+- Add evaluation tests
+
+
+Q6. Why use structured outputs?
+-------------------------------
+Structured outputs make LLM responses machine-readable and easier to validate.
+For example, reorder recommendations could return JSON with sku, quantity, vendor_id, priority, and reason.
+
+
+Q7. What would you change in the current classifier?
+----------------------------------------------------
+I would replace text parsing with structured output or a Pydantic schema.
+The current classifier asks the LLM to return lines like "intent: inventory_status", which is simple but not fully robust.
+
+
+Q8. How do you evaluate an Agentic AI system?
+---------------------------------------------
+I would test:
+- intent classification accuracy
+- tool call correctness
+- factual accuracy of responses
+- recommendation usefulness
+- latency
+- cost
+- failure handling
+- hallucination rate
+
+
+Q9. What is human-in-the-loop?
+------------------------------
+Human-in-the-loop means the AI can recommend an action, but a human confirms before execution.
+For this project, creating reorder tickets or purchase orders should require approval.
+
+
+Q10. What observability would you add?
+--------------------------------------
+I would log:
+- query
+- intent
+- route path
+- node timing
+- tool calls
+- DB queries
+- LLM token usage
+- final response
+- errors
+I would use LangSmith or OpenTelemetry for tracing.
+
+
+8. SYSTEM DESIGN DISCUSSION
+===========================
+
+If asked to design production Inventra:
+---------------------------------------
+Frontend:
+Streamlit or React dashboard.
+
+Backend:
+FastAPI service exposing endpoints for chat, inventory, tickets, and reports.
+
+Workflow:
+LangGraph for orchestration.
+
+LLM:
+OpenAI via LangChain with structured outputs and tool calling.
+
+Database:
+PostgreSQL for transactional data.
+
+Analytics:
+Data warehouse for sales history and forecasting.
+
+Background jobs:
+Celery, RQ, Airflow, or cron jobs for forecast updates.
+
+Security:
+Authentication, RBAC, audit logs, secrets manager.
+
+Deployment:
+Docker, cloud hosting, managed database, CI/CD.
+
+
+9. QUESTIONS TO ASK THE INTERVIEWER
+===================================
+
+1. How does your team decide when to use deterministic code vs LLM reasoning?
+2. Do you use LangGraph or another orchestration framework for agents?
+3. How do you evaluate agentic workflows in production?
+4. Do your AI agents trigger side effects, or do you require human approval?
+5. What observability stack do you use for LLM and tool-call tracing?
+6. Are your GenAI systems connected to enterprise data sources like ERP, CRM, or data warehouses?
+7. How do you manage prompt/version changes and regression testing?
+
+
+10. 2-MINUTE PROJECT EXPLANATION
+================================
+
+Inventra is an AI-powered inventory and financial management system.
+It allows users to ask natural-language questions about stock levels, sales patterns, financial summaries, vendor choices, and reorder recommendations.
+
+The core workflow is built using LangGraph.
+The coordinator classifies the user query, routes it to deterministic reporting or AI decision-making, gathers data from SQLite, and formats the final response.
+
+The system separates deterministic logic from LLM reasoning.
+Reports like low-stock items and financial summaries are calculated using SQL and Pandas.
+Recommendations like reorder planning and sales opportunities use OpenAI through LangChain, with tools such as OpenWeatherMap for weather-aware planning.
+
+The project also includes ticket automation, conversation memory, forecast tracking, a Streamlit dashboard, and an MCP server integration demo.
+For local reproducibility, I used synthetic CSV seed data loaded into SQLite.
+In production, I would migrate the data layer to PostgreSQL, use migrations, add tracing, structured outputs, human approval for write actions, and deploy behind an API service.
+
