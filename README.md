@@ -4,6 +4,16 @@
 
 ---
 
+## Table of Contents
+
+- [Project At A Glance](#project-at-a-glance)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Sample Queries](#sample-queries)
+- [Contributing](#contributing)
+
+---
+
 ## Project At A Glance
 
 Inventra helps inventory and finance teams ask natural-language questions, inspect stock and sales data, get weather-aware reorder recommendations, and manage restocking tickets from one Streamlit dashboard.
@@ -13,21 +23,6 @@ Inventra helps inventory and finance teams ask natural-language questions, inspe
 ![Inventra LangGraph workflow](docs/assets/langgraph-workflow.svg)
 
 ![Inventra system architecture](docs/assets/inventra-architecture.svg)
-
----
-
-## Table of Contents
-
-- [Project At A Glance](#project-at-a-glance)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [API Keys Setup](#api-keys-setup)
-- [Troubleshooting](#troubleshooting)
-- [Technology Stack](#technology-stack)
 
 ---
 

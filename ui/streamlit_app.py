@@ -19,6 +19,22 @@ from services.forecast_updater import get_forecast_updater
 
 logger = get_logger(__name__)
 
+# Ensure database exists; if not, seed it from CSVs (helpful for fresh deployments)
+try:
+    from database import seed_db as _db_seeder
+    db_path = get_settings().db_path_resolved
+    if not db_path.exists():
+        # Only attempt seeding when running in an environment that supports I/O
+        try:
+            st.write("Initializing application database from CSV seed files...")
+            _db_seeder.seed_database()
+            st.success("Database initialized.")
+        except Exception as _e:
+            logger.warning(f"Database seeding failed: {_e}")
+except Exception:
+    # If imports or seeding fail in some environments, continue without blocking the UI
+    logger.info("Database seeder not available or skipped.")
+
 # Page config
 st.set_page_config(
     page_title="Inventra - AI Inventory Management",
