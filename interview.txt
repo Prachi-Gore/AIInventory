@@ -46,7 +46,7 @@ This is the master inventory dataset. Each row represents a product/SKU currentl
 It tells us what the product is, where it is stocked, how many units are available, when it should be reordered, its unit cost, and the preferred vendor.
 
 Important columns:
-- sku: Unique product identifier. Used to join inventory with sales, finance, tickets, and forecasts.
+- sku: Unique product identifier. Used to join inventory with sales, finance, tickets
 - name: Human-readable product name, for example Mixer Grinder or Pressure Cooker.
 - category: Product grouping, such as Kitchen Appliances.
 - region: Business region where the stock is held, such as North, South, East, West, or Central.

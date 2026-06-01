@@ -2,6 +2,10 @@
 
 **An intelligent multi-agent system for inventory management, financial analysis, and business decision-making using LangGraph, OpenAI, and weather forecasting.**
 
+**Live Demo:** https://inventraai.streamlit.app/
+
+**Portfolio:** https://prachi-gore-portfolio.netlify.app/
+
 ---
 
 ## Table of Contents
