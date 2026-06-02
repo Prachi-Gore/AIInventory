@@ -151,7 +151,7 @@ avg_delay_days, reliability_rating, return_acceptance_rate, total_shipments_last
 payment_terms_days, bulk_discount_percent, min_order_qty
 
 How to explain:
-This dataset represents vendor performance and procurement details.
+This dataset represents vendor performance and procurement(financial action) details.
 It helps the system recommend not only what to reorder, but also which vendor is best suited based on reliability, quality, lead time, pricing, and terms.
 
 Important columns:
@@ -169,7 +169,7 @@ Important columns:
 - min_order_qty: Minimum order quantity.
 
 Interview explanation:
-"The vendor dataset is used by the decision agent to make procurement recommendations. Instead of recommending reorder quantity alone, the system can also explain vendor tradeoffs such as quality, lead time, and reliability."
+"The vendor dataset is used by the decision agent to make procurement(financial action) recommendations. Instead of recommending reorder quantity alone, the system can also explain vendor tradeoffs such as quality, lead time, and reliability."
 
 Code connection:
 services/data_pipeline.py fetches vendors sorted by quality, reliability, and lead time.
@@ -194,7 +194,7 @@ inventory.sku
 Simple explanation:
 Inventory is the central product table.
 Sales and finance describe product movement and money.
-Vendors describe procurement options.
+Vendors describe procurement(financial action) options.
 Tickets represent operational actions created from low-stock or reorder recommendations.
 
 Important note:

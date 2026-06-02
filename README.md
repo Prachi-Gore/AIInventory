@@ -1,8 +1,8 @@
-# Inventra - AI-Powered Inventory & Financial Management System
+# AI Inventory Assistant - AI-Powered Inventory & Financial Management System
 
 **An intelligent multi-agent system for inventory management, financial analysis, and business decision-making using LangGraph, OpenAI, and weather forecasting.**
 
-**Live Demo:** https://inventraai.streamlit.app/
+**Live Demo:** https://aiinventory.streamlit.app/
 
 **Portfolio:** https://prachi-gore-portfolio.netlify.app/
 
@@ -20,13 +20,13 @@
 
 ## Project At A Glance
 
-Inventra helps inventory and finance teams ask natural-language questions, inspect stock and sales data, get weather-aware reorder recommendations, and manage restocking tickets from one Streamlit dashboard.
+AI Inventory Assistant helps inventory and finance teams ask natural-language questions, inspect stock and sales data, get weather-aware reorder recommendations, and manage restocking tickets from one Streamlit dashboard.
 
-![Inventra request workflow](docs/assets/inventra-workflow.svg)
+![AI Inventory Assistant request workflow](docs/assets/inventra-workflow.svg)
 
-![Inventra LangGraph workflow](docs/assets/langgraph-workflow.svg)
+![AI Inventory Assistant LangGraph workflow](docs/assets/langgraph-workflow.svg)
 
-![Inventra system architecture](docs/assets/inventra-architecture.svg)
+![AI Inventory Assistant system architecture](docs/assets/inventra-architecture.svg)
 
 ---
 

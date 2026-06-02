@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 # Page config must come before any Streamlit commands
 st.set_page_config(
-    page_title="Inventra - AI Inventory Management",
+    page_title="AI Inventory Assistant - Inventory & Financial Management",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -85,7 +85,7 @@ def init_session_state():
     """Initialize session state variables."""
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I'm Inventra, your AI assistant for inventory and financial management. How can I help you today?"}
+            {"role": "assistant", "content": "Hello! I'm AI Inventory Assistant, your AI assistant for inventory and financial management. How can I help you today?"}
         ]
 
 
@@ -97,7 +97,7 @@ def get_user_message_count() -> int:
 def render_sidebar():
     """Render sidebar with system info and quick actions."""
     with st.sidebar:
-        st.markdown("### 📦 Inventra")
+        st.markdown("### 📦 AI Inventory Assistant")
         st.markdown("AI-Powered Inventory Management")
         st.markdown("---")
 
@@ -144,7 +144,7 @@ def render_sidebar():
 
 def render_chat_interface():
     """Render main chat interface."""
-    st.markdown("<div class='main-header'>Inventra AI Assistant</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-header'>AI Inventory Assistant</div>", unsafe_allow_html=True)
     st.markdown("<div class='sub-header'>Ask me anything about inventory, sales, finances, or get recommendations</div>", unsafe_allow_html=True)
 
     # Display chat messages
