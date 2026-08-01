@@ -151,7 +151,7 @@ avg_delay_days, reliability_rating, return_acceptance_rate, total_shipments_last
 payment_terms_days, bulk_discount_percent, min_order_qty
 
 How to explain:
-This dataset represents vendor performance and procurement(financial action) details.
+This dataset represents vendor performance and procurement details.
 It helps the system recommend not only what to reorder, but also which vendor is best suited based on reliability, quality, lead time, pricing, and terms.
 
 Important columns:
@@ -169,7 +169,7 @@ Important columns:
 - min_order_qty: Minimum order quantity.
 
 Interview explanation:
-"The vendor dataset is used by the decision agent to make procurement(financial action) recommendations. Instead of recommending reorder quantity alone, the system can also explain vendor tradeoffs such as quality, lead time, and reliability."
+"The vendor dataset is used by the decision agent to make procurement recommendations. Instead of recommending reorder quantity alone, the system can also explain vendor tradeoffs such as quality, lead time, and reliability."
 
 Code connection:
 services/data_pipeline.py fetches vendors sorted by quality, reliability, and lead time.
@@ -321,6 +321,7 @@ Q9. How does weather-aware intelligence work?
 Sales data includes weather features such as temperature, rainfall, humidity, and weather_condition.
 The weather tool also fetches upcoming forecasts.
 The decision agent uses this context to reason about likely demand changes.
+This is currently weather-informed recommendation logic, not a trained time-series or machine-learning demand model.
 
 
 Q10. What is the role of the weather tool?
@@ -404,8 +405,8 @@ This is safer because side effects should be controlled and auditable.
 
 Q21. How would you make ticket creation safer?
 ----------------------------------------------
-I would add human-in-the-loop approval.
-The LLM can recommend a ticket, but a user should approve before the system writes it to the database.
+The Streamlit flow already applies a human-in-the-loop control: the recommendation is displayed first, and tickets are created only when the user clicks the create-ticket button.
+For production, I would strengthen this with RBAC, confirmation details, idempotency, duplicate-ticket checks, audit logs, transaction boundaries, and a separate purchase-order approval stage.
 
 
 Q22. What is the Streamlit UI responsible for?
@@ -584,7 +585,283 @@ The system separates deterministic logic from LLM reasoning.
 Reports like low-stock items and financial summaries are calculated using SQL and Pandas.
 Recommendations like reorder planning and sales opportunities use OpenAI through LangChain, with tools such as OpenWeatherMap for weather-aware planning.
 
-The project also includes ticket automation, conversation memory, forecast tracking, a Streamlit dashboard, and an MCP server integration demo.
+The project also includes ticket automation, persistent conversation logging, forecast tracking, a Streamlit dashboard, and an MCP server integration demo.
 For local reproducibility, I used synthetic CSV seed data loaded into SQLite.
 In production, I would migrate the data layer to PostgreSQL, use migrations, add tracing, structured outputs, human approval for write actions, and deploy behind an API service.
 
+
+11. COMPLETE PROJECT-BASED INTERVIEW QUESTIONS
+==============================================
+
+Q1. Explain the end-to-end architecture.
+-----------------------------------------
+The user enters a query through Streamlit or the CLI. The coordinator uses an OpenAI model to classify the intent and extract region, category, and SKU. LangGraph routes the state either to deterministic reporting or to an AI decision path. Reporting functions query SQLite and aggregate data with SQL and Pandas. Decision functions add inventory, sales, finance, and vendor context and may invoke the OpenWeatherMap tool. A response node formats the result, and the interaction is persisted in the conversations table.
+
+
+Q2. Which intents does the coordinator support?
+------------------------------------------------
+The implemented intents are inventory_status, sales_analysis, financial_report, ticket_status, reorder_recommendation, sales_opportunity, vendor_selection, and general. The first four use deterministic report paths. The next three continue to the decision agent. General queries go directly to the default response.
+
+
+Q3. Does every request execute all four LangGraph nodes?
+-------------------------------------------------------
+No. Every request begins at classify. Known data and decision intents go to gather. Report-only intents then go directly to respond, while recommendation intents go through decide and then respond. General intent skips gather and decide. This conditional routing avoids unnecessary LLM work.
+
+
+Q4. What data is gathered before recommendation intents?
+--------------------------------------------------------
+The gather node currently has explicit data loaders only for report intents. For recommendation intents it stores an empty data_result, and the decision-agent functions fetch their own required context. This works, but duplicates responsibility between orchestration and decision layers. A cleaner version would gather all context in the gather node and pass it through AgentState.
+
+
+Q5. How are parameters extracted from natural language?
+-------------------------------------------------------
+The classifier prompt asks the model to return line-oriented fields for intent, region, category, and SKU. parse_classification_response parses those fields and normalizes null-like values. This is easy to understand, but structured output using a Pydantic model or JSON schema would be more reliable.
+
+
+Q6. What happens when classification returns an unknown intent?
+---------------------------------------------------------------
+The router treats it like a general request and sends it to respond. The current default response is a generic help message. A production system should validate against an enum, retry malformed classifier output, and provide supported examples or a clarification path.
+
+
+Q7. Is the project really multi-agent?
+--------------------------------------
+It has separated coordinator, report, and decision responsibilities, so it is a multi-component agentic design. More precisely, the coordinator is a LangGraph workflow, the report agent is deterministic business logic, and the decision agent is an LLM tool-calling agent. I would use that precise description instead of implying three fully autonomous agents communicating peer-to-peer.
+
+
+Q8. How does the decision agent call weather data?
+--------------------------------------------------
+It is built with LangChain's create_tool_calling_agent and AgentExecutor. The get_weather_forecast StructuredTool has an explicit schema-compatible name and arguments. The LLM decides when to invoke it, and the result is returned to the agent for its final recommendation.
+
+
+Q9. What happens if OpenWeatherMap fails?
+-----------------------------------------
+The weather wrapper catches the error and returns a five-day synthetic Clear-weather fallback. The fallback field exists in the dictionary result, but the formatted tool response does not expose that flag to the LLM. That is a limitation: production behavior should label stale/fallback data clearly, log the reason, retry selectively, and avoid presenting simulated weather as live data.
+
+
+Q10. Is weather data cached?
+----------------------------
+The settings define weather_cache_ttl, but the current weather implementation does not use a cache. I would not claim caching is implemented. I would add an in-memory or Redis cache keyed by region and forecast horizon to reduce latency, API cost, and rate-limit pressure.
+
+
+Q11. How is reorder quantity calculated?
+-----------------------------------------
+The deterministic ticket flow sets target stock to reorder_threshold multiplied by 2 and returns max(0, target_stock minus current_qty). For example, with threshold 20 and current stock 10, it recommends 30 units. This is a simple safety-stock heuristic, not EOQ or probabilistic optimization.
+
+
+Q12. Does the LLM's stated reorder quantity create the ticket quantity?
+-----------------------------------------------------------------------
+No. The displayed analysis is LLM-generated, but bulk ticket creation recomputes quantity using the deterministic threshold heuristic. This prevents free-form model text from directly controlling the database. A better structured workflow would have the model propose typed recommendations, validate them, display them for approval, and then persist exactly the approved values.
+
+
+Q13. How is a vendor chosen when bulk tickets are created?
+---------------------------------------------------------
+The current implementation uses the first vendor in the top_vendors context for every low-stock item. Vendors are sorted by quality score, reliability rating, and lead time, but the reduced vendor context does not retain price, discount, minimum quantity, or product-specific compatibility. This is a demo limitation; production selection should score eligible vendors per SKU and business constraint.
+
+
+Q14. Can duplicate reorder tickets be created?
+----------------------------------------------
+Yes. There is no uniqueness constraint or pre-insert check for an existing pending ticket for the same SKU. I would add an idempotency key or a partial uniqueness rule, check pending tickets inside the same transaction, and make retries safe.
+
+
+Q15. How are ticket side effects controlled?
+---------------------------------------------
+The decision agent only returns analysis. In Streamlit, the user must explicitly click a button to create tickets. The service then performs parameterized INSERT statements. Ticket status changes and deletion are also deterministic UI/service operations, not autonomous LLM tool calls.
+
+
+Q16. What is the ticket lifecycle?
+----------------------------------
+Tickets start as pending and the UI supports pending, approved, rejected, and completed status values. The schema does not enforce those values with a CHECK constraint, and the service does not validate the status argument. Production code should validate transitions, record who changed them, preserve timestamps and notes, and generally soft-delete rather than permanently delete audit records.
+
+
+Q17. Is conversation memory actually used for follow-up reasoning?
+------------------------------------------------------------------
+Not yet. Each query and response is stored in SQLite with session_id, intent, and extracted metadata, but process_query creates a new state containing only the current user message. Previous conversations are not loaded into the classifier or decision prompts. Therefore the project has persistent conversation logging/storage, but not fully integrated conversational context memory.
+
+
+Q18. How would you implement reliable conversational memory?
+------------------------------------------------------------
+I would generate and consistently pass a session ID, retrieve the most recent relevant turns with a strict token budget, summarize older history, and inject the context into the graph state. I would also separate user-visible memory from audit logs, support deletion/retention policies, and test ambiguous follow-ups such as "What about the South region?"
+
+
+Q19. How does finance calculation avoid hallucination?
+------------------------------------------------------
+The application queries finance rows using parameterized SQL, treats sale and purchase amounts separately, and calculates totals, net profit, and margin in Python. The LLM does not invent the source numbers. It can explain those numbers only after deterministic calculation.
+
+
+Q20. What edge case exists in profit-margin calculation?
+---------------------------------------------------------
+Division by zero must be avoided when there are no sales. The response formatter checks total_sales before calculating margin. Any other entry point, such as CLI statistics, should apply the same guard consistently.
+
+
+Q21. How does the sales date fallback work?
+-------------------------------------------
+The pipeline first queries rows newer than the calculated cutoff. If none exist, it falls back to all historical rows so the demo still produces output with old seed data. The response still labels the period as the requested number of days, which can be misleading. A production response should disclose the actual date range or return no recent data.
+
+
+Q22. Is avg_daily_sales based on active sales days?
+---------------------------------------------------
+No. It divides total quantity by the requested number of calendar days, even after the all-time fallback. This makes it a period-normalized rate rather than the mean over observed selling days. I would choose and document the correct business definition, then calculate against the actual covered period.
+
+
+Q23. Does weather-impact analysis prove causation?
+--------------------------------------------------
+No. Grouping quantity by weather condition shows association only. Demand may also depend on season, promotions, pricing, holidays, stockouts, geography, and category. A stronger analysis would normalize exposure, control confounders, validate statistically, and compare against a non-weather baseline.
+
+
+Q24. What is forecast accuracy in this project?
+------------------------------------------------
+The forecasts table stores predicted and actual demand and weather. Accuracy is calculated as max(0, 100 minus absolute_error divided by predicted_demand times 100), with a special case when prediction is zero. This is a simple percentage-style score. For serious evaluation I would use MAE, RMSE, WAPE or sMAPE, bias, and metrics segmented by SKU, region, and forecast horizon.
+
+
+Q25. Is the forecast-accuracy feature active in the UI?
+-------------------------------------------------------
+The supporting service and rendering function exist, but the Forecast Accuracy tab is currently commented out. I would describe it as implemented backend/experimental UI functionality, not as an active user-facing tab in the current application.
+
+
+Q26. How is SQL injection reduced?
+----------------------------------
+Normal filters and mutations use parameterized queries. The admin viewer dynamically interpolates a table identifier, but the selected name comes from trusted SQLite metadata and is quoted. Values such as row limits remain parameters. In production I would also use an allowlist, read-only database credentials for viewers, authentication, and authorization.
+
+
+Q27. What security gaps remain?
+-------------------------------
+The demo lacks full user authentication, RBAC, tenant isolation, CSRF-aware API boundaries, rate limiting, comprehensive input validation, encrypted sensitive fields, and formal audit controls. The admin database viewer supports a password, but if ADMIN_PASSWORD is absent it currently warns and continues, so production should fail closed instead.
+
+
+Q28. How are secrets managed?
+-----------------------------
+Configuration is loaded with Pydantic Settings from environment variables or a local .env file. The repository should contain only .env.example; real OpenAI, OpenWeatherMap, Hugging Face, and admin credentials must stay out of Git. Production should use the hosting platform's secret store or a managed vault and rotate credentials.
+
+
+Q29. What validation constraints are missing from SQLite?
+---------------------------------------------------------
+The schema has primary keys but no foreign keys between inventory, vendors, sales, finance, and tickets. It also lacks CHECK constraints for non-negative quantities and money, allowed ticket states, and valid rates. Useful indexes on dates, SKU, region, ticket status, and session ID are also absent. These are important migration items for production.
+
+
+Q30. How does database access work?
+----------------------------------
+Database helpers centralize SQLite connections, queries, commands, and DataFrame conversion. Higher layers use parameterized SQL and return dictionaries or Pandas DataFrames. For production I would add connection pooling through a PostgreSQL driver or ORM, explicit transactions for multi-step writes, migrations, timeouts, and read/write separation where needed.
+
+
+Q31. What are the limitations of SQLite here?
+---------------------------------------------
+SQLite is excellent for a portable demo but has limited concurrent-write behavior, weaker operational tooling, and no built-in multi-user authorization. Multiple Streamlit users creating or updating tickets could encounter contention. PostgreSQL is a better target for concurrent production workloads.
+
+
+Q32. How would you test this project?
+-------------------------------------
+I would add unit tests for classification parsing, routing, reorder math, finance formulas, weather aggregation, and formatting; database integration tests using a temporary SQLite database; mocked OpenAI and weather-tool tests; LangGraph path tests for every intent; UI smoke tests; and end-to-end tests for recommendation, approval, and ticket persistence. The current repository has no dedicated automated test suite, so I would state that clearly.
+
+
+Q33. How would you evaluate recommendation quality?
+----------------------------------------------------
+I would build a versioned evaluation dataset containing queries, expected intent and entities, required tool calls, grounded source facts, and acceptable actions. I would measure routing accuracy, factual consistency, constraint satisfaction, human acceptance, inventory outcomes, latency, token cost, and regression against a deterministic baseline.
+
+
+Q34. How do you handle LLM and API failures?
+---------------------------------------------
+The UI and CLI catch top-level errors, and weather has a fallback. However, there is no comprehensive retry, timeout, circuit-breaker, or graceful classifier fallback strategy. Production handling should classify transient versus permanent failures, use bounded retries with backoff, preserve trace IDs, and return a safe deterministic response when possible.
+
+
+Q35. How would you reduce latency and cost?
+-------------------------------------------
+Use deterministic keyword or small-model routing for obvious queries, compile and reuse the graph and clients instead of rebuilding them per request, cache weather and stable reports, reduce prompt context, request structured concise outputs, batch independent data reads, and track per-node latency and tokens. Recommendation calls should be reserved for cases that need reasoning.
+
+
+Q36. Why is temperature set to 0.2?
+-----------------------------------
+A low temperature makes classification and business recommendations more repeatable while allowing limited flexibility in explanation. Structured output, validation, and evaluations are still necessary because low temperature does not guarantee correctness.
+
+
+Q37. What is the role of Pandas versus SQL?
+-------------------------------------------
+SQL handles filtering, joins, and retrieval close to the data. Pandas handles small in-memory demo aggregations and transformations such as grouping sales by weather or region. At production scale, I would push large aggregations into SQL or a warehouse and avoid loading unnecessary rows into application memory.
+
+
+Q38. Why use LEFT JOIN for sales and ticket enrichment?
+-------------------------------------------------------
+LEFT JOIN preserves operational rows even if related inventory or vendor data is missing. That helps detect data-quality issues instead of silently dropping transactions. The application must still handle null product or vendor fields safely.
+
+
+Q39. What does MCP add, and what does it not add?
+-------------------------------------------------
+The standalone MCP server exposes a Hugging Face sentiment-analysis API as a standard tool over stdio. It demonstrates interoperability, but it is not wired into the main Inventra LangGraph and sentiment analysis is not central to inventory decisions. I would either expose genuine Inventra capabilities through MCP or position the current server strictly as an integration proof of concept.
+
+
+Q40. How would you containerize and deploy it?
+----------------------------------------------
+I would create a small Python image, install pinned dependencies, run the Streamlit app or preferably a FastAPI backend plus separate frontend, inject secrets at runtime, persist data in managed PostgreSQL, add health/readiness checks, run database migrations as a controlled release step, and use CI/CD with tests, security scans, and rollback support.
+
+
+Q41. What monitoring and business metrics matter?
+-------------------------------------------------
+Technical metrics include request latency, errors, LLM tokens and cost, tool-call success, weather latency, database contention, and route distribution. Quality metrics include intent accuracy, groundedness, recommendation acceptance, forecast error, stockout rate, excess inventory, vendor on-time delivery, ticket completion time, and realized margin impact.
+
+
+Q42. What would you change first if given another week?
+-------------------------------------------------------
+First I would add automated tests and structured classification output. Next I would make fallback/stale data visible, connect true session history, add duplicate-safe transactional tickets with validated states, and implement vendor-per-SKU scoring. Those changes address correctness and safety before adding more features.
+
+
+12. SCENARIO AND FOLLOW-UP QUESTIONS
+====================================
+
+Q1. A manager asks, "Order stock for every low item." What should happen?
+--------------------------------------------------------------------------
+The system should interpret this as a consequential write request, show the affected SKUs, quantities, vendors, estimated cost, and warnings, then require explicit approval. The approved operation should be idempotent and auditable. The current UI covers the confirmation step for recommendations, but needs stronger duplicate prevention and approval records.
+
+
+Q2. The weather API is down during a monsoon decision. What do you do?
+---------------------------------------------------------------------
+Do not silently represent synthetic Clear weather as current truth. Mark weather unavailable or stale, show the age and source of any cached value, base the response on historical sales with reduced confidence, and allow the manager to postpone the action.
+
+
+Q3. The LLM recommends a vendor that does not supply the SKU. What prevents it?
+-------------------------------------------------------------------------------
+The current data model does not represent vendor-SKU eligibility, so nothing fully prevents it. I would introduce a vendor_products table with price, MOQ, capacity, validity period, and lead time per SKU, constrain recommendations to query results, and validate the selected vendor before ticket creation.
+
+
+Q4. Two users approve the same recommendation simultaneously. What happens?
+----------------------------------------------------------------------------
+Today duplicate tickets can be inserted. A production fix needs a database transaction plus a uniqueness/idempotency mechanism, not only a UI check, because concurrency must be enforced at the persistence layer.
+
+
+Q5. Sales suddenly rise, but inventory data is several hours old. What do you show?
+-------------------------------------------------------------------------------
+Display data freshness timestamps and confidence, avoid claiming real-time stock, and warn that reorder advice may be stale. In production I would ingest inventory events or frequent ERP snapshots and establish freshness SLAs.
+
+
+Q6. How would you support multiple companies?
+----------------------------------------------
+Add tenant_id to every business table and every query, enforce tenant isolation at the database and authorization layers, store tenant-specific policies and API credentials securely, and include isolation tests. Separate schemas or databases may be appropriate for stronger isolation.
+
+
+Q7. How would you explain a recommendation to an auditor?
+---------------------------------------------------------
+Store the query, normalized inputs, data snapshot/version, formulas, eligible vendors, tool results, model and prompt versions, recommendation, human approver, and resulting ticket. The explanation should separate computed facts from LLM-generated rationale.
+
+
+Q8. How would you replace the heuristic with real demand forecasting?
+---------------------------------------------------------------------
+Build a time-indexed dataset by SKU and region, include lags, seasonality, holidays, promotions, prices, stockouts, and weather, then compare simple seasonal baselines with models such as gradient boosting or probabilistic time-series methods. Use rolling-origin backtesting and generate prediction intervals. The reorder policy would combine forecast demand during lead time, safety stock, current inventory, open orders, MOQ, and service-level targets.
+
+
+13. IMPORTANT CLAIMS TO AVOID
+=============================
+
+- Do not say inventory is real-time; it is a seeded SQLite snapshot.
+- Do not say the project trains a forecasting model; it currently uses historical aggregation, weather context, LLM reasoning, heuristics, and forecast tracking.
+- Do not say persistent memory automatically gives contextual follow-ups; stored history is not currently injected into new requests.
+- Do not say MCP powers the main workflow; it is a separate integration demo.
+- Do not say vendor choice is fully optimized; ranking and bulk-ticket selection are simplified.
+- Do not say caching is implemented merely because weather_cache_ttl exists in settings.
+- Do not say all database relationships are enforced; most are logical joins without foreign-key constraints.
+- Do not say the repository has comprehensive tests; there is currently no dedicated test suite.
+- Do not say every answer is generated by AI; reports and calculations are intentionally deterministic.
+- Do not say the system autonomously purchases stock; it creates internal reorder tickets after a UI confirmation.
+
+
+14. 30-SECOND PROJECT PITCH
+===========================
+
+Inventra is a portfolio-grade agentic inventory and finance assistant built with Python, LangGraph, OpenAI, SQLite, Pandas, Streamlit, and OpenWeatherMap. It routes natural-language questions to deterministic reports or tool-assisted recommendations, keeps numeric business logic outside the LLM, and uses human confirmation before creating reorder tickets. The current version is a reproducible local demo using synthetic data; my production roadmap focuses on structured outputs, contextual memory, transactional safety, PostgreSQL, evaluation, observability, and secure deployment.

@@ -125,19 +125,15 @@ def render_sidebar():
 
         if st.button("🔄 Check All Regions"):
             st.session_state.pending_query = "Give me inventory status for all regions"
-            st.rerun()
 
         if st.button("💰 Financial Summary"):
             st.session_state.pending_query = "Show me the financial summary"
-            st.rerun()
 
         if st.button("📝 View Tickets"):
             st.session_state.pending_query = "What are my pending tickets?"
-            st.rerun()
 
         if st.button("🎯 Get Recommendations"):
             st.session_state.pending_query = "Give me reorder recommendations"
-            st.rerun()
 
         st.markdown("---")
         st.markdown(f"**Model:** {get_settings().openai_model}")
@@ -191,8 +187,6 @@ def handle_user_query(prompt: str):
                 if final_state.get("intent") == "reorder_recommendation" and decision_result.get("context"):
                     st.session_state.latest_reorder_analysis = decision_result
 
-                st.rerun()
-
             except Exception as e:
                 import traceback
                 error_msg = f"Sorry, I encountered an error: {str(e)}"
@@ -201,7 +195,6 @@ def handle_user_query(prompt: str):
                 logger.error(f"Error processing query: {e}")
                 logger.error(traceback.format_exc())
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
-                st.rerun()
 
 
 def render_reorder_ticket_action():
